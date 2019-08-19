@@ -57,7 +57,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
             path = None
         # check whether encrypted.
         if (zi.flag_bits & 0x1) and opt.password is None:
-            print("ERROR: password required. {} is encrypted.".format(path[-1]))
+            print("ERROR: password required. {} is encrypted.".format(filename))
             exit(1)
         # extract if needed.
         if opt.extract_mode:
