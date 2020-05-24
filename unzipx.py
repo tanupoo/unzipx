@@ -25,15 +25,18 @@ ap.add_argument("-R", action="store_false", dest="recursive",
                 help="extract only the files, not including the directories.")
 ap.add_argument("-q", "--quiet", action="store_false", dest="verbose",
                 help="enable quiet mode.")
+ap.add_argument("-d", action="store_true", dest="debug",
+                help="enable debug mode.")
 opt = ap.parse_args()
 
-file_list = None
+extract_file_list = None
 if opt.file_number is None:
+    # means all files.
     pass
 elif isinstance(opt.file_number, int):
-    file_list = [opt.file_number]
+    extract_file_list = [opt.file_number]
 elif isinstance(opt.file_number, str):
-    file_list = [int(_) for _ in opt.file_number.split(",")]
+    extract_file_list = [int(_) for _ in opt.file_number.split(",")]
 else:
     ap.print_help()
     exit(1)
@@ -61,7 +64,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
             exit(1)
         # extract if needed.
         if opt.extract_mode:
-            if file_list is None or n in file_list:
+            if extract_file_list is None or n in extract_file_list:
                 # create directories.
                 if path is not None and opt.recursive:
                     try:
@@ -72,16 +75,16 @@ with zipfile.ZipFile(opt.zip_file) as z:
                         if opt.verbose:
                             print("{} has been created.".format(path))
                 # extract the file
-                with open(filename, "wb") as fd:
-                    try:
-                        fd.write(z.read(zi))
-                    except Exception as e:
-                        if "password required" in str(e):
-                            print("ERROR: password required. {} is encrypted.".
-                                  format(filename))
-                            exit(1)
-                        else:
-                            print(e)
+                if not zi.is_dir():
+                    with open(filename, "wb") as fd:
+                        try:
+                            fd.write(z.read(zi))
+                        except Exception as e:
+                            if "password required" in str(e):
+                                print(f"ERROR: password required for {filename}")
+                                exit(1)
+                            else:
+                                print(e)
                 if opt.verbose:
                     print("extract {} into {}".format(n, filename))
         else:
