@@ -19,10 +19,10 @@ ap.add_argument("-p", "--password", action="store", dest="password",
                 help="specify the password for the zipped file.")
 ap.add_argument("-x", action="store_true", dest="extract_mode",
                 help="extract the contents.  default is to list the files.")
-ap.add_argument("-s", action="store_true", dest="redecode_cp932",
-                help="extract the filename as cp932.")
+ap.add_argument("-S", action="store_false", dest="redecode_cp932",
+                help="disable to extract the filename as cp932.")
 ap.add_argument("-R", action="store_false", dest="recursive",
-                help="extract only the files, not including the directories.")
+                help="extract only the 1st level of files, not including the sub directories.")
 ap.add_argument("-q", "--quiet", action="store_false", dest="verbose",
                 help="enable quiet mode.")
 ap.add_argument("-d", action="store_true", dest="debug",
@@ -41,8 +41,9 @@ else:
     ap.print_help()
     exit(1)
 
-n = 1
 with zipfile.ZipFile(opt.zip_file) as z:
+    n = 1
+    file_info = []
     if opt.password:
         z.setpassword(bytes(opt.password, "ascii"))
     for zi in z.infolist():
@@ -88,6 +89,23 @@ with zipfile.ZipFile(opt.zip_file) as z:
                 if opt.verbose:
                     print("extract {} into {}".format(n, filename))
         else:
+            if opt.debug:
+                print(f"filename: {filename}")
+                print(f"  compress_size : {zi.compress_size}")
+                print(f"  compress_type : {zi.compress_type}")
+                print(f"  compress_type : {zi.comment}")
+                print(f"  create_system : {zi.create_system}")
+                print(f"  create_version: {zi.create_version}")
+                print(f"  external_attr : {zi.external_attr}")
+                print(f"  compress_type : {zi.extra}")
+                print(f"  compress_type : {zi.extract_version}")
+                print(f"  flag_bits     : {zi.flag_bits}")
+                print(f"  header_offset : {zi.header_offset}")
+                print(f"  internal_attr : {zi.internal_attr}")
+                print(f"  orig_filename : {zi.orig_filename}")
+                print(f"  volume        : {zi.volume}")
+            file_info.append([str(zi.file_size), zi.date_time, filename])
+            """
             if path is not None:
                 for i,p in enumerate(path.split("/")):
                     if i == 0:
@@ -98,5 +116,15 @@ with zipfile.ZipFile(opt.zip_file) as z:
                 print("  "*(1+i), filename)
             else:
                 print("{:d}: {}".format(n,filename))
+            """
         #
         n += 1
+    if not opt.extract_mode:
+        h = [ "Length", "Date", "Time", "Name" ]
+        max_w1 = max([len(x[0]) for x in file_info]) + 1
+        print(f"{h[0].rjust(max_w1)} {h[1].center(10)} {h[2].ljust(5)} {h[3]}")
+        print(f"{'-'*max_w1} {'-'*10} {'-'*5} {'-'*4}")
+        for x in file_info:
+            date = f"{x[1][0]:04}-{x[1][1]:02}-{x[1][2]:02}"
+            time = f"{x[1][3]:02}:{x[1][4]:02}"
+            print(f"{x[0].rjust(max_w1)} {date} {time} {x[2]}")
