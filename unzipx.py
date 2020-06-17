@@ -3,7 +3,10 @@
 import zipfile
 import argparse
 from os import makedirs
-import sys
+import unicodedata
+
+# normalization
+valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
 
 ap = argparse.ArgumentParser(
         description="unzip helper to extract non utf-8 files.",
@@ -11,23 +14,35 @@ ap = argparse.ArgumentParser(
 ap.add_argument("zip_file", metavar="FILE", help="specify a zipped file.")
 ap.add_argument("--prefix", action="store", dest="prefix", default="",
                 help="specify a prefix.")
-ap.add_argument("-n", action="store", dest="file_number",
+ap.add_argument("-i", action="store", dest="file_number",
                 help="""specify a file number or list to be extracted.
-                e.g. -n 2, or -n 2,3 (1 origin)
+                e.g. -i 2, or -i 2,3 (1 origin)
                 """)
 ap.add_argument("-p", "--password", action="store", dest="password",
                 help="specify the password for the zipped file.")
 ap.add_argument("-x", action="store_true", dest="extract_mode",
                 help="extract the contents.  default is to list the files.")
-ap.add_argument("-S", action="store_false", dest="redecode_cp932",
-                help="disable to extract the filename as cp932.")
+ap.add_argument("-e", "--encoding", action="store", dest="filename_encoding",
+                default="auto",
+                help="""specify a filename encoding.
+                e.g. cp932, utf-8.  default is cp932.""")
+ap.add_argument("-D", action="store_false", dest="enable_conversion",
+                help="disable to convert the filename.")
 ap.add_argument("-R", action="store_false", dest="recursive",
-                help="extract only the 1st level of files, not including the sub directories.")
+                help="""extract only the 1st level of files,
+                not including the sub directories.""")
+ap.add_argument("-n", "--normalize", action="store", dest="unicode_normalize",
+                help=f"""specify a string for normalization of the filename.
+                valid string are {valid_unicode_normalize_options}""")
 ap.add_argument("-q", "--quiet", action="store_false", dest="verbose",
                 help="enable quiet mode.")
 ap.add_argument("-d", action="store_true", dest="debug",
                 help="enable debug mode.")
 opt = ap.parse_args()
+
+# filename encoding
+if opt.enable_conversion is False:
+    opt.filename_encoding = None
 
 extract_file_list = None
 if opt.file_number is None:
@@ -47,11 +62,45 @@ with zipfile.ZipFile(opt.zip_file) as z:
     if opt.password:
         z.setpassword(bytes(opt.password, "ascii"))
     for zi in z.infolist():
-        # get the filename including the path.
-        if opt.redecode_cp932:
-            filename = zi.filename.encode("cp437").decode("cp932")
-        else:
+        """
+        get the filename including the path.
+        Because zipfile.py converts the filename as it was cp437
+        when flag_bits doesn't have utf-8 bit (0x800).
+        The problem is Windows OS put the filename into the zip file
+        as it is.  And, in Japan, it uses Shift_JIS (cp932) Usually.
+        So, zipfile.py should converts with cp932 in that case.
+        The strategy here is that:
+            TBD...
+        """
+        if opt.filename_encoding is None:
             filename = zi.filename
+        elif opt.filename_encoding == "auto":
+            if zi.flag_bits & 0x800:
+                filename = zi.filename.encode("cp437").decode("utf-8")
+            else:
+                """
+                some zip software (e.g. mac) doesn't set utf-8 bit even when
+                the encoding of the filename was in utf-8.
+                So, firstly here try to decode cp932, then try to decode utf-8.
+                """
+                try:
+                    filename = zi.filename.encode("cp437").decode("utf-8")
+                except:
+                    filename = zi.filename.encode("cp437").decode("cp932")
+        else:
+            """
+            if flag_bits has 0x800, zipfile.py converted with utf-8.
+            so, here needs to back conversion by utf-8,
+            then convert it with one specified.
+            if not, zipfile.py uses cp437 as well.
+            """
+            if zi.flag_bits & 0x800:
+                filename = zi.filename.encode("utf-8").decode(opt.filename_encoding)
+            else:
+                filename = zi.filename.encode("cp437").decode(opt.filename_encoding)
+        # normalize
+        if opt.unicode_normalize:
+            filename = unicodedata.normalize(opt.unicode_normalize, filename)
         # get the path and filename.
         if filename.startswith("/"):
             raise ValueError("ERROR: starting with a slash must not be allowed.")
@@ -61,6 +110,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
             path = None
         # check whether encrypted.
         if (zi.flag_bits & 0x1) and opt.password is None:
+            # XXX how to know if the password is encoded as utf-8 or not.
             print("ERROR: password required. {} is encrypted.".format(filename))
             exit(1)
         # extract if needed.
@@ -100,11 +150,22 @@ with zipfile.ZipFile(opt.zip_file) as z:
                 print(f"  compress_type : {zi.extra}")
                 print(f"  compress_type : {zi.extract_version}")
                 print(f"  flag_bits     : {zi.flag_bits}")
+                print("    utf-8: {}".format("yes" if zi.flag_bits & 0x800
+                                             else "no"))
                 print(f"  header_offset : {zi.header_offset}")
                 print(f"  internal_attr : {zi.internal_attr}")
+                print(f"  filename(zi)  : {zi.filename}")
+                """
+                if the flag has utf-8 bit, ZipFile reads the filename as utf-8.
+                otherwise, it reads as cp437.
+                """
+                if zi.flag_bits & 0x800:
+                    print("    {}".format(bytes(zi.filename, encoding="utf-8")))
+                else:
+                    print("    {}".format(bytes(zi.filename, encoding="cp437")))
                 print(f"  orig_filename : {zi.orig_filename}")
                 print(f"  volume        : {zi.volume}")
-            file_info.append([str(zi.file_size), zi.date_time, filename])
+            file_info.append([str(n), str(zi.file_size), zi.date_time, filename])
             """
             if path is not None:
                 for i,p in enumerate(path.split("/")):
@@ -120,11 +181,12 @@ with zipfile.ZipFile(opt.zip_file) as z:
         #
         n += 1
     if not opt.extract_mode:
-        h = [ "Length", "Date", "Time", "Name" ]
-        max_w1 = max([len(x[0]) for x in file_info]) + 1
-        print(f"{h[0].rjust(max_w1)} {h[1].center(10)} {h[2].ljust(5)} {h[3]}")
-        print(f"{'-'*max_w1} {'-'*10} {'-'*5} {'-'*4}")
+        max_w0 = 4
+        h = [ "#", "Length", "Date", "Time", "Name" ]
+        max_w1 = max([len("Length"), max([len(x[1]) for x in file_info])]) + 2
+        print(f"{h[0].rjust(max_w0)} {h[1].rjust(max_w1)} {h[2].center(10)} {h[3].ljust(5)} {h[4]}")
+        print(f"{'-'*max_w0} {'-'*max_w1} {'-'*10} {'-'*5} {'-'*4}")
         for x in file_info:
-            date = f"{x[1][0]:04}-{x[1][1]:02}-{x[1][2]:02}"
-            time = f"{x[1][3]:02}:{x[1][4]:02}"
-            print(f"{x[0].rjust(max_w1)} {date} {time} {x[2]}")
+            date = f"{x[2][0]:04}-{x[2][1]:02}-{x[2][2]:02}"
+            time = f"{x[2][3]:02}:{x[2][4]:02}"
+            print(f"{x[0].rjust(max_w0)} {x[1].rjust(max_w1)} {date} {time} {x[3]}")
