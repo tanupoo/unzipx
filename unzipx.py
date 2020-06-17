@@ -76,7 +76,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
             filename = zi.filename
         elif opt.filename_encoding == "auto":
             if zi.flag_bits & 0x800:
-                filename = zi.filename.encode("cp437").decode("utf-8")
+                filename = zi.filename
             else:
                 """
                 some zip software (e.g. mac) doesn't set utf-8 bit even when
