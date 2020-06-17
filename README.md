@@ -3,14 +3,10 @@ zipx and unzipx
 
 zip and unzip alternative which is more friendly with East Asian Charactor.
 
-## Background
-
-zipfile.py converts the filename encoding into utf-8 if the flag_bits
-in zipinfo has the utf-8 bit (0x800).
-It converts the filename encoding into cp437 if the flag_bits doesn't
-have the utf-8 bit.
-
 ## Problem
+
+- zipfile.py is a nice tool.  However, it converts the filename encoding
+  into cp437 if the flag_bits in zipinfo doesn't have the utf-8 bit (0x800).
 
 - zip software in Windows OS (at least, 7 and 10) puts the filename
   into the zip file as it is.  And, most users in Japan usually uses
