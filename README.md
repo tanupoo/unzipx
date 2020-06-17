@@ -19,6 +19,9 @@ have the utf-8 bit.
 - some zip software (e.g. mac, /usr/bin/zip) doesn't set utf-8 bit
   even when the encoding of the filename is in utf-8.
 
+- when the filename contains some combining charactors,
+  you will see the collapse filename.  It happens whe you use a dum terminal.
+
 ## Strategy
 
 So, firstly this unzipx checks the utf-8 flag in flag_bits of zipinfo.
@@ -29,6 +32,8 @@ If it doesn't set, try to convert the filename into cp932,
 then, if the conversion fails, it converts into utf-8.
 
 In other way, with the -e option, you can specify the encoding you expects.
+
+zipx and unzipx support to normalize the filename before zip or unzip files.
 
 ## FYI
 
