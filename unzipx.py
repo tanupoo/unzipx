@@ -4,6 +4,48 @@ import zipfile
 import argparse
 from os import makedirs
 import unicodedata
+import re
+
+def is_target_file(n, filename):
+    """
+    the order is significant.
+    1. if the number of the filename is matched with n.
+    2. if the filename is matched with a regex in opt.ex_files.
+    3. if extract_file_list is empty.
+    """
+    if n in extract_file_list:
+        return True
+    for regex in opt.ex_files:
+        r = re.match(regex, filename)
+        if r:
+            return True
+    if not (extract_file_list or opt.ex_files) and not extract_file_list:
+        return True
+    return False
+
+def do_extract(zi, path):
+    # create directories.
+    if path is not None and opt.recursive:
+        try:
+            makedirs(path, mode=511, exist_ok=False)
+        except FileExistsError:
+            pass
+        else:
+            if opt.verbose:
+                print("{} has been created.".format(path))
+    # extract the file
+    if not zi.is_dir():
+        with open(filename, "wb") as fd:
+            try:
+                fd.write(z.read(zi))
+            except Exception as e:
+                if "password required" in str(e):
+                    print(f"ERROR: password required for {filename}")
+                    exit(1)
+                else:
+                    print(e)
+    if opt.verbose:
+        print("extract {} into {}".format(n, filename))
 
 # normalization
 valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
@@ -11,7 +53,9 @@ valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
 ap = argparse.ArgumentParser(
         description="unzip helper to extract non utf-8 files.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-ap.add_argument("zip_file", metavar="FILE", help="specify a zipped file.")
+ap.add_argument("zip_file", help="specify a zipped file.")
+ap.add_argument("ex_files", nargs="*",
+                help="specify files to be extracted.")
 ap.add_argument("--prefix", action="store", dest="prefix", default="",
                 help="specify a prefix.")
 ap.add_argument("-i", action="store", dest="file_number",
@@ -44,7 +88,8 @@ opt = ap.parse_args()
 if opt.enable_conversion is False:
     opt.filename_encoding = None
 
-extract_file_list = None
+# make the list for extracting.
+extract_file_list = []
 if opt.file_number is None:
     # means all files.
     pass
@@ -54,6 +99,9 @@ elif isinstance(opt.file_number, str):
     extract_file_list = [int(_) for _ in opt.file_number.split(",")]
 else:
     ap.print_help()
+    exit(1)
+if extract_file_list and not opt.extract_mode:
+    print("ERROR: if the -i option is used, the -x option is required.")
     exit(1)
 
 with zipfile.ZipFile(opt.zip_file) as z:
@@ -108,37 +156,18 @@ with zipfile.ZipFile(opt.zip_file) as z:
             path = filename[:filename.rindex("/")]
         else:
             path = None
+
         # check whether encrypted.
         if (zi.flag_bits & 0x1) and opt.password is None:
             # XXX how to know if the password is encoded as utf-8 or not.
             print("ERROR: password required. {} is encrypted.".format(filename))
             exit(1)
-        # extract if needed.
-        if opt.extract_mode:
-            if extract_file_list is None or n in extract_file_list:
-                # create directories.
-                if path is not None and opt.recursive:
-                    try:
-                        makedirs(path, mode=511, exist_ok=False)
-                    except FileExistsError:
-                        pass
-                    else:
-                        if opt.verbose:
-                            print("{} has been created.".format(path))
-                # extract the file
-                if not zi.is_dir():
-                    with open(filename, "wb") as fd:
-                        try:
-                            fd.write(z.read(zi))
-                        except Exception as e:
-                            if "password required" in str(e):
-                                print(f"ERROR: password required for {filename}")
-                                exit(1)
-                            else:
-                                print(e)
-                if opt.verbose:
-                    print("extract {} into {}".format(n, filename))
-        else:
+
+        if is_target_file(n, filename):
+
+            # extract if needed.
+            if opt.extract_mode:
+                do_extract(zi, path)
             if opt.debug:
                 print(f"filename: {filename}")
                 print(f"  compress_size : {zi.compress_size}")
@@ -151,7 +180,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
                 print(f"  compress_type : {zi.extract_version}")
                 print(f"  flag_bits     : {zi.flag_bits}")
                 print("    utf-8: {}".format("yes" if zi.flag_bits & 0x800
-                                             else "no"))
+                                            else "no"))
                 print(f"  header_offset : {zi.header_offset}")
                 print(f"  internal_attr : {zi.internal_attr}")
                 print(f"  filename(zi)  : {zi.filename}")
@@ -160,9 +189,11 @@ with zipfile.ZipFile(opt.zip_file) as z:
                 otherwise, it reads as cp437.
                 """
                 if zi.flag_bits & 0x800:
-                    print("    {}".format(bytes(zi.filename, encoding="utf-8")))
+                    print("    {}".format(
+                            bytes(zi.filename, encoding="utf-8")))
                 else:
-                    print("    {}".format(bytes(zi.filename, encoding="cp437")))
+                    print("    {}".format(
+                            bytes(zi.filename, encoding="cp437")))
                 print(f"  orig_filename : {zi.orig_filename}")
                 print(f"  volume        : {zi.volume}")
             file_info.append([str(n), str(zi.file_size), zi.date_time, filename])
@@ -180,7 +211,8 @@ with zipfile.ZipFile(opt.zip_file) as z:
             """
         #
         n += 1
-    if not opt.extract_mode:
+
+    if not opt.extract_mode and file_info:
         max_w0 = 4
         h = [ "#", "Length", "Date", "Time", "Name" ]
         max_w1 = max([len("Length"), max([len(x[1]) for x in file_info])]) + 2
