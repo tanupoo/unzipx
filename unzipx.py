@@ -8,18 +8,21 @@ import re
 
 def is_target_file(n, filename):
     """
-    the order is significant.
+    evaluating in below order.
     1. if the number of the filename is matched with n.
-    2. if the filename is matched with a regex in opt.ex_files.
-    3. if extract_file_list is empty.
+    2. if the filename is not matched with a regex in opt.excluding_files.
+    3. if the filename is matched with a regex in opt.ex_files.
+    4. if extract_file_number_list is empty or None.
     """
-    if n in extract_file_list:
+    if n in extract_file_number_list:
         return True
+    for regex in opt.excluding_files:
+        if re.match(regex, filename):
+            return False
     for regex in opt.ex_files:
-        r = re.match(regex, filename)
-        if r:
+        if re.match(regex, filename):
             return True
-    if not (extract_file_list or opt.ex_files) and not extract_file_list:
+    if not extract_file_number_list:
         return True
     return False
 
@@ -55,7 +58,7 @@ ap = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 ap.add_argument("zip_file", help="specify a zipped file.")
 ap.add_argument("ex_files", nargs="*",
-                help="specify files to be extracted.")
+                help="specify files (regex acceptable) to be extracted.")
 ap.add_argument("--prefix", action="store", dest="prefix", default="",
                 help="specify a prefix.")
 ap.add_argument("-i", action="store", dest="file_number",
@@ -66,9 +69,12 @@ ap.add_argument("-p", "--password", action="store", dest="password",
                 help="specify the password for the zipped file.")
 ap.add_argument("-x", action="store_true", dest="extract_mode",
                 help="extract the contents.  default is to list the files.")
-ap.add_argument("-e", "--encoding", action="store", dest="filename_encoding",
+ap.add_argument("-e", action="append", dest="excluding_files", default=[],
+                help="specify a file name (regex acceptable) to be ignored."
+                "This option can be specified in multiple.")
+ap.add_argument("-E", "--encoding", action="store", dest="filename_encoding",
                 default="auto",
-                help="""specify a filename encoding.
+                help="""specify a filename encoding in the zip file.
                 e.g. cp932, utf-8.  default is cp932.""")
 ap.add_argument("-D", action="store_false", dest="enable_conversion",
                 help="disable to convert the filename.")
@@ -89,18 +95,18 @@ if opt.enable_conversion is False:
     opt.filename_encoding = None
 
 # make the list for extracting.
-extract_file_list = []
+extract_file_number_list = []
 if opt.file_number is None:
     # means all files.
     pass
 elif isinstance(opt.file_number, int):
-    extract_file_list = [opt.file_number]
+    extract_file_number_list = [opt.file_number]
 elif isinstance(opt.file_number, str):
-    extract_file_list = [int(_) for _ in opt.file_number.split(",")]
+    extract_file_number_list = [int(_) for _ in opt.file_number.split(",")]
 else:
     ap.print_help()
     exit(1)
-if extract_file_list and not opt.extract_mode:
+if extract_file_number_list and not opt.extract_mode:
     print("ERROR: if the -i option is used, the -x option is required.")
     exit(1)
 
