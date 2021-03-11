@@ -107,7 +107,7 @@ else:
     ap.print_help()
     exit(1)
 if extract_file_number_list and not opt.extract_mode:
-    print("ERROR: if the -i option is used, the -x option is required.")
+    print("ERROR: the -x option is required when the -i option is used.")
     exit(1)
 
 with zipfile.ZipFile(opt.zip_file) as z:
