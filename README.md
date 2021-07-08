@@ -5,17 +5,19 @@ zip and unzip alternative which is more friendly with East Asian Charactor.
 
 ## Problem
 
-- zipfile.py is a nice tool.  However, it converts the filename encoding
-  into cp437 if the flag_bits in zipinfo doesn't have the utf-8 bit (0x800).
+- zipfile.py is a nice tool.  However, it converts the encoding of the filename
+  into cp437 if the utf-8 bit (0x800) in the flag_bits of zipinfo is not set.
 
 - zip software in Windows OS (at least, 7 and 10) puts the filename
-  into the zip file as it is.  And, most users in Japan usually uses
-  Shift_JIS (cp932) as the filenames.
+  into the zip file as it is, and it doesn't set the utf-8 bit.
+  And, most users in Japan usually uses Shift_JIS (cp932) as the filenames.
 
 - some zip software (e.g. mac, /usr/bin/zip) doesn't set utf-8 bit
   even when the encoding of the filename is in utf-8.
 
-- when the filename contains some combining charactors,
+- Mac Archive Utility doesn't handle the filename conversion as well.
+
+- when the filename contains some combining charactors of Unicode,
   you will see the collapse filename.  It happens whe you use a dum terminal.
 
 ## Strategy
