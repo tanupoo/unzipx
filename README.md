@@ -11,14 +11,16 @@ zip and unzip alternative which is more friendly with East Asian Charactor.
 - zip software in Windows OS (at least, 7 and 10) puts the filename
   into the zip file as it is, and it doesn't set the utf-8 bit.
   And, most users in Japan usually uses Shift_JIS (cp932) as the filenames.
+  Mac users will see a corrupted filename when they decode such a zip file.
 
 - some zip software (e.g. mac, /usr/bin/zip) doesn't set utf-8 bit
   even when the encoding of the filename is in utf-8.
+  Windows users will see a corrupted filename when they decode such a zip file.
 
 - Mac Archive Utility doesn't handle the filename conversion as well.
 
 - when the filename contains some combining charactors of Unicode,
-  you will see the collapse filename.  It happens whe you use a dum terminal.
+  you will see the corrupted filename.  It happens when you use a dum terminal.
 
 ## Strategy
 
