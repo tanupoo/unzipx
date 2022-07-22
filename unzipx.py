@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-import zipfile
+import pyzipper as zipfile
+from pyzipper import AESZipFile as ZipFile
+
 import argparse
 from os import makedirs
 import unicodedata
@@ -110,7 +112,7 @@ if extract_file_number_list and not opt.extract_mode:
     print("ERROR: the -x option is required when the -i option is used.")
     exit(1)
 
-with zipfile.ZipFile(opt.zip_file) as z:
+with ZipFile(opt.zip_file) as z:
     n = 1
     file_info = []
     if opt.password:
@@ -163,6 +165,37 @@ with zipfile.ZipFile(opt.zip_file) as z:
         else:
             path = None
 
+        if is_target_file(n, filename) and opt.debug:
+            print(f"filename: {filename}")
+            print(f"  compress_size : {zi.compress_size}")
+            print(f"  compress_type : {zi.compress_type}")
+            print(f"  comment : {zi.comment}")
+            print(f"  create_system : {zi.create_system}")
+            print(f"  create_version: {zi.create_version}")
+            print(f"  external_attr : {zi.external_attr}")
+            print(f"  extra : {zi.extra}")
+            print(f"  extract_version : {zi.extract_version}")
+            print(f"  flag_bits     : {zi.flag_bits}")
+            print("    utf-8: {}".format("yes" if zi.flag_bits & 0x800
+                                        else "no"))
+            print(f"  header_offset : {zi.header_offset}")
+            print(f"  internal_attr : {zi.internal_attr}")
+            print(f"  filename      :")
+            print(f"    converted   : {filename}")
+            print(f"    zi.filename : {zi.filename}")
+            print(f"    zi.orig     : {zi.orig_filename}")
+            """
+            if the flag has utf-8 bit, ZipFile reads the filename as utf-8.
+            otherwise, it reads as cp437.
+            """
+            if zi.flag_bits & 0x800:
+                print("    {}".format(
+                        bytes(zi.filename, encoding="utf-8")))
+            else:
+                print("    {}".format(
+                        bytes(zi.filename, encoding="cp437")))
+            print(f"  volume        : {zi.volume}")
+
         # check whether encrypted.
         if (zi.flag_bits & 0x1) and opt.password is None:
             # XXX how to know if the password is encoded as utf-8 or not.
@@ -174,34 +207,7 @@ with zipfile.ZipFile(opt.zip_file) as z:
             # extract if needed.
             if opt.extract_mode:
                 do_extract(zi, path)
-            if opt.debug:
-                print(f"filename: {filename}")
-                print(f"  compress_size : {zi.compress_size}")
-                print(f"  compress_type : {zi.compress_type}")
-                print(f"  compress_type : {zi.comment}")
-                print(f"  create_system : {zi.create_system}")
-                print(f"  create_version: {zi.create_version}")
-                print(f"  external_attr : {zi.external_attr}")
-                print(f"  compress_type : {zi.extra}")
-                print(f"  compress_type : {zi.extract_version}")
-                print(f"  flag_bits     : {zi.flag_bits}")
-                print("    utf-8: {}".format("yes" if zi.flag_bits & 0x800
-                                            else "no"))
-                print(f"  header_offset : {zi.header_offset}")
-                print(f"  internal_attr : {zi.internal_attr}")
-                print(f"  filename(zi)  : {zi.filename}")
-                """
-                if the flag has utf-8 bit, ZipFile reads the filename as utf-8.
-                otherwise, it reads as cp437.
-                """
-                if zi.flag_bits & 0x800:
-                    print("    {}".format(
-                            bytes(zi.filename, encoding="utf-8")))
-                else:
-                    print("    {}".format(
-                            bytes(zi.filename, encoding="cp437")))
-                print(f"  orig_filename : {zi.orig_filename}")
-                print(f"  volume        : {zi.volume}")
+
             file_info.append([str(n), str(zi.file_size), zi.date_time, filename])
             """
             if path is not None:
