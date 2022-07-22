@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 
-import zipfile
-import argparse
+import pyzipper as zipfile
+from pyzipper import AESZipFile as ZipFile
+
 from os.path import exists
 from os import scandir, stat
 from stat import S_ISDIR
 import unicodedata
 import shutil
+from argparse import ArgumentParser
+from argparse import ArgumentDefaultsHelpFormatter
 
 # for _write_end_record()
 import struct
@@ -23,7 +26,7 @@ stringCentralDir = b"PK\001\002"
 # normalization
 valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
 
-class ZipFileImproved(zipfile.ZipFile):
+class ZipFileImproved(ZipFile):
     """
     zipfile.py in Python 3.8
     """
@@ -225,9 +228,9 @@ def walkdir(filename, zfd):
                 continue
             walkdir(entry.path, zfd)
 
-ap = argparse.ArgumentParser(
+ap = ArgumentParser(
         description="zip and compress the files named a utf-8 filename.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=ArgumentDefaultsHelpFormatter)
 ap.add_argument("zip_file", help="specify a zip file.")
 ap.add_argument("files", nargs="+", help="specify files to be zipped.")
 ap.add_argument("-p", "--password", action="store", dest="password",
