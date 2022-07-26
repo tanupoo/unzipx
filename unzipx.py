@@ -35,7 +35,7 @@ def is_target_file(n, filename):
         return True
     return False
 
-def do_extract(zi, path):
+def do_extract(z, zi, c_fname, path):
     # check if the zipped file can be read.
     try:
         _check_compression(zi.compress_type)
@@ -53,18 +53,18 @@ def do_extract(zi, path):
                 print("{} has been created.".format(path))
     # extract the file
     if not zi.is_dir():
-        with open(filename, "wb") as fd:
+        with open(c_fname, "wb") as fd:
             try:
                 fd.write(z.read(zi))
             except Exception as e:
                 if "password required" in str(e):
-                    print(f"ERROR: password required for {filename}")
+                    print(f"ERROR: password required for {c_fname}")
                     exit(1)
                 else:
                     print(f"ERROR: {e}")
                 raise
     if opt.verbose:
-        print("extract {} into {}".format(n, filename))
+        print("extract {} into {}".format(n, c_fname))
 
 # normalization
 valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
@@ -143,10 +143,10 @@ with ZipFile(opt.zip_file) as z:
             TBD...
         """
         if opt.filename_encoding is None:
-            filename = zi.filename
+            c_fname = zi.filename
         elif opt.filename_encoding == "auto":
             if zi.flag_bits & 0x800:
-                filename = zi.filename
+                c_fname = zi.filename
             else:
                 """
                 some zip software (e.g. mac) doesn't set utf-8 bit even when
@@ -154,9 +154,9 @@ with ZipFile(opt.zip_file) as z:
                 So, firstly here try to decode cp932, then try to decode utf-8.
                 """
                 try:
-                    filename = zi.filename.encode("cp437").decode("utf-8")
+                    c_fname = zi.filename.encode("cp437").decode("utf-8")
                 except:
-                    filename = zi.filename.encode("cp437").decode("cp932")
+                    c_fname = zi.filename.encode("cp437").decode("cp932")
         else:
             """
             if flag_bits has 0x800, zipfile.py converted with utf-8.
@@ -165,22 +165,23 @@ with ZipFile(opt.zip_file) as z:
             if not, zipfile.py uses cp437 as well.
             """
             if zi.flag_bits & 0x800:
-                filename = zi.filename.encode("utf-8").decode(opt.filename_encoding)
+                c_fname = zi.filename.encode("utf-8").decode(opt.filename_encoding)
             else:
-                filename = zi.filename.encode("cp437").decode(opt.filename_encoding)
+                c_fname = zi.filename.encode("cp437").decode(opt.filename_encoding)
         # normalize
         if opt.unicode_normalize:
-            filename = unicodedata.normalize(opt.unicode_normalize, filename)
+            c_fname = unicodedata.normalize(opt.unicode_normalize,
+                                                   c_fname)
         # get the path and filename.
-        if filename.startswith("/"):
+        if c_fname.startswith("/"):
             raise ValueError("ERROR: starting with a slash must not be allowed.")
-        elif filename.find("/") > 0:
-            path = filename[:filename.rindex("/")]
+        elif c_fname.find("/") > 0:
+            path = c_fname[:c_fname.rindex("/")]
         else:
             path = None
 
-        if is_target_file(n, filename) and opt.debug:
-            print(f"filename: {filename}")
+        if is_target_file(n, c_fname) and opt.debug:
+            print(f"filename: {c_fname}")
             print(f"  compress_size : {zi.compress_size}")
             print(f"  compress_type : {zi.compress_type}")
             print(f"  comment : {zi.comment}")
@@ -194,10 +195,8 @@ with ZipFile(opt.zip_file) as z:
                                         else "no"))
             print(f"  header_offset : {zi.header_offset}")
             print(f"  internal_attr : {zi.internal_attr}")
-            print(f"  filename      :")
-            print(f"    converted   : {filename}")
-            print(f"    zi.filename : {zi.filename}")
-            print(f"    zi.orig     : {zi.orig_filename}")
+            print(f"  zi.filename   : {zi.filename}")
+            print(f"  zi.orig       : {zi.orig_filename}")
             """
             if the flag has utf-8 bit, ZipFile reads the filename as utf-8.
             otherwise, it reads as cp437.
@@ -213,19 +212,19 @@ with ZipFile(opt.zip_file) as z:
         # check whether encrypted.
         if (zi.flag_bits & 0x1) and opt.password is None:
             # XXX how to know if the password is encoded as utf-8 or not.
-            print("ERROR: password required. {} is encrypted.".format(filename))
+            print("ERROR: password required. {} is encrypted.".format(c_fname))
             exit(1)
 
-        if is_target_file(n, filename):
+        if is_target_file(n, c_fname):
 
             # extract if needed.
             if opt.extract_mode:
                 try:
-                    do_extract(zi, path)
+                    do_extract(z, zi, c_fname, path)
                 except Exception as e:
                     break
 
-            file_info.append([str(n), str(zi.file_size), zi.date_time, filename])
+            file_info.append([str(n), str(zi.file_size), zi.date_time, c_fname])
             """
             if path is not None:
                 for i,p in enumerate(path.split("/")):
@@ -234,9 +233,9 @@ with ZipFile(opt.zip_file) as z:
                     elif i > 0:
                         print("  "*i, end="")
                     print(p)
-                print("  "*(1+i), filename)
+                print("  "*(1+i), c_fname)
             else:
-                print("{:d}: {}".format(n,filename))
+                print("{:d}: {}".format(n,c_fname))
             """
         #
         n += 1
