@@ -1,7 +1,14 @@
 zipx and unzipx
 ===============
 
-zip and unzip alternative which is more friendly with East Asian Charactor.
+zip and unzip alternative which is more friendly with East Asian Charactor,
+and new encryption algorithms.
+
+## Not required, but recommended.
+
+```
+pip install pyzipper
+```
 
 ## Problem
 
@@ -22,6 +29,11 @@ zip and unzip alternative which is more friendly with East Asian Charactor.
 - when the filename contains some combining charactors of Unicode,
   you will see the corrupted filename.  It happens when you use a dum terminal.
 
+- Another problem is the version of PKZIP.  Several versions exist.  Some
+  tools don't some recent versions.  For example, Mac native unzip
+  doesn't support some encryption algorithms such as AES256.  In this case,
+  you see the message like "need PK compat. v5.1 (can do v4.5)".
+
 ## Strategy
 
 So, firstly this unzipx checks the utf-8 flag in flag_bits of zipinfo.
@@ -34,6 +46,8 @@ then, if the conversion fails, it converts into utf-8.
 In other way, with the -e option, you can specify the encoding you expects.
 
 zipx and unzipx support to normalize the filename before zip or unzip files.
+
+To support new Encryption algorithms, unzipx tries to use pyzipper if available.
 
 ## FYI
 
