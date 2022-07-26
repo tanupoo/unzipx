@@ -1,7 +1,14 @@
 #!/usr/bin/env python
 
-import pyzipper as zipfile
-from pyzipper import AESZipFile as ZipFile
+try:
+    import pyzipper as zipfile
+    import pyzipper as zipfile
+    from pyzipper.zipfile import _check_compression
+    from pyzipper import AESZipFile as ZipFile
+except ModuleNotFoundError:
+    import zipfile
+    from zipfile import _check_compression
+    from zipfile import ZipFile as ZipFile
 
 import argparse
 from os import makedirs
@@ -29,6 +36,12 @@ def is_target_file(n, filename):
     return False
 
 def do_extract(zi, path):
+    # check if the zipped file can be read.
+    try:
+        _check_compression(zi.compress_type)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        raise
     # create directories.
     if path is not None and opt.recursive:
         try:
@@ -48,7 +61,8 @@ def do_extract(zi, path):
                     print(f"ERROR: password required for {filename}")
                     exit(1)
                 else:
-                    print(e)
+                    print(f"ERROR: {e}")
+                raise
     if opt.verbose:
         print("extract {} into {}".format(n, filename))
 
@@ -206,7 +220,10 @@ with ZipFile(opt.zip_file) as z:
 
             # extract if needed.
             if opt.extract_mode:
-                do_extract(zi, path)
+                try:
+                    do_extract(zi, path)
+                except Exception as e:
+                    break
 
             file_info.append([str(n), str(zi.file_size), zi.date_time, filename])
             """
