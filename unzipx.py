@@ -3,11 +3,11 @@
 try:
     import pyzipper as zipfile
     import pyzipper as zipfile
-    from pyzipper.zipfile import _check_compression
+    from pyzipper.zipfile import _check_compression, BadZipFile
     from pyzipper import AESZipFile as ZipFile
 except ModuleNotFoundError:
     import zipfile
-    from zipfile import _check_compression
+    from zipfile import _check_compression, BadZipFile
     from zipfile import ZipFile as ZipFile
 
 import argparse
@@ -56,12 +56,18 @@ def do_extract(z, zi, c_fname, path):
         with open(c_fname, "wb") as fd:
             try:
                 fd.write(z.read(zi))
-            except Exception as e:
+            except BadZipFile as e:
+                if "File name in directory" in str(e):
+                    pass
+                # ignore this exception.
+            except RuntimeError as e:
                 if "password required" in str(e):
                     print(f"ERROR: password required for {c_fname}")
                     exit(1)
                 else:
-                    print(f"ERROR: {e}")
+                    raise
+            except Exception as e:
+                print(f"ERROR: {e}")
                 raise
     if opt.verbose:
         print("extract {} into {}".format(n, c_fname))
