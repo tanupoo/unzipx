@@ -12,6 +12,7 @@ except ModuleNotFoundError:
 
 import argparse
 from os import makedirs
+from os import path as ospath
 import unicodedata
 import re
 
@@ -35,7 +36,7 @@ def is_target_file(n, filename):
         return True
     return False
 
-def do_extract(z, zi, c_fname, path):
+def do_extract(z, zi, dname, fpath):
     # check if the zipped file can be read.
     try:
         _check_compression(zi.compress_type)
@@ -43,17 +44,18 @@ def do_extract(z, zi, c_fname, path):
         print(f"ERROR: {e}")
         raise
     # create directories.
-    if path is not None and opt.recursive:
+    if dname is not None and opt.recursive:
         try:
-            makedirs(path, mode=511, exist_ok=False)
+            makedirs(dname, mode=511, exist_ok=False)
         except FileExistsError:
+            # the directory exists.
             pass
         else:
-            if opt.verbose:
-                print("{} has been created.".format(path))
+            if not opt.quiet:
+                print("{} has been created.".format(dname))
     # extract the file
     if not zi.is_dir():
-        with open(c_fname, "wb") as fd:
+        with open(fpath, "wb") as fd:
             try:
                 fd.write(z.read(zi))
             except BadZipFile as e:
@@ -62,15 +64,15 @@ def do_extract(z, zi, c_fname, path):
                 # ignore this exception.
             except RuntimeError as e:
                 if "password required" in str(e):
-                    print(f"ERROR: password required for {c_fname}")
+                    print(f"ERROR: password required for {fpath}")
                     exit(1)
                 else:
                     raise
             except Exception as e:
                 print(f"ERROR: {e}")
                 raise
-    if opt.verbose:
-        print("extract {} into {}".format(n, c_fname))
+    if not opt.quiet:
+        print("extract {} into {}".format(n, fpath))
 
 # normalization
 valid_unicode_normalize_options = ["NFC", "NFKC", "NFD", "NFKD"]
@@ -98,22 +100,24 @@ ap.add_argument("-E", "--encoding", action="store", dest="filename_encoding",
                 default="auto",
                 help="""specify a filename encoding in the zip file.
                 e.g. cp932, utf-8.  default is cp932.""")
-ap.add_argument("-D", action="store_false", dest="enable_conversion",
+ap.add_argument("--no-convertion", action="store_false", dest="conversion",
                 help="disable to convert the filename.")
+ap.add_argument("-D", "--dest-dir", action="store", dest="dest_dir",
+                help="specify a directory to store the files extracted.")
 ap.add_argument("-R", action="store_false", dest="recursive",
                 help="""extract only the 1st level of files,
                 not including the sub directories.""")
 ap.add_argument("-n", "--normalize", action="store", dest="unicode_normalize",
                 help=f"""specify a string for normalization of the filename.
                 valid string are {valid_unicode_normalize_options}""")
-ap.add_argument("-q", "--quiet", action="store_false", dest="verbose",
+ap.add_argument("-q", "--quiet", action="store_true", dest="quiet",
                 help="enable quiet mode.")
 ap.add_argument("-d", action="store_true", dest="debug",
                 help="enable debug mode.")
 opt = ap.parse_args()
 
 # filename encoding
-if opt.enable_conversion is False:
+if opt.conversion is False:
     opt.filename_encoding = None
 
 # make the list for extracting.
@@ -178,13 +182,19 @@ with ZipFile(opt.zip_file) as z:
         if opt.unicode_normalize:
             c_fname = unicodedata.normalize(opt.unicode_normalize,
                                                    c_fname)
-        # get the path and filename.
-        if c_fname.startswith("/"):
-            raise ValueError("ERROR: starting with a slash must not be allowed.")
-        elif c_fname.find("/") > 0:
-            path = c_fname[:c_fname.rindex("/")]
+        # separate the filename and the path.
+        # c_fname includes both.
+        # add dest_dir into the path if specified.
+        if c_fname is not None:
+            dname, fname = ospath.split(c_fname)
+            if opt.dest_dir is not None:
+                dname = ospath.join(opt.dest_dir, dname)
         else:
-            path = None
+            raise ValueError("ERROR: c_fname is None")
+        if opt.dest_dir is None and dname.startswith("/"):
+            raise ValueError("ERROR: c_fname started by a slash "
+                             "is not allowed. use the --dest-dir option.")
+        fpath = ospath.join(dname, fname)
 
         if is_target_file(n, c_fname) and opt.debug:
             print(f"filename: {c_fname}")
@@ -226,23 +236,11 @@ with ZipFile(opt.zip_file) as z:
             # extract if needed.
             if opt.extract_mode:
                 try:
-                    do_extract(z, zi, c_fname, path)
+                    do_extract(z, zi, dname, fpath)
                 except Exception as e:
                     break
 
-            file_info.append([str(n), str(zi.file_size), zi.date_time, c_fname])
-            """
-            if path is not None:
-                for i,p in enumerate(path.split("/")):
-                    if i == 0:
-                        print("{:d}: ".format(n), end="")
-                    elif i > 0:
-                        print("  "*i, end="")
-                    print(p)
-                print("  "*(1+i), c_fname)
-            else:
-                print("{:d}: {}".format(n,c_fname))
-            """
+            file_info.append([str(n), str(zi.file_size), zi.date_time, fpath])
         #
         n += 1
 
