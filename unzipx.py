@@ -44,7 +44,7 @@ def do_extract(z, zi, dname, fpath):
         print(f"ERROR: {e}")
         raise
     # create directories.
-    if dname is not None and opt.recursive:
+    if dname and opt.recursive:
         try:
             makedirs(dname, mode=511, exist_ok=False)
         except FileExistsError:
@@ -117,7 +117,7 @@ ap.add_argument("-d", action="store_true", dest="debug",
 opt = ap.parse_args()
 
 # filename encoding
-if opt.conversion is False:
+if not opt.conversion:
     opt.filename_encoding = None
 
 # make the list for extracting.
