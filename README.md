@@ -4,20 +4,24 @@ zipx and unzipx
 zip and unzip alternative which is more friendly with East Asian Charactor,
 and new encryption algorithms.
 
-## Not required, but recommended.
+## Installation
+
+Not required, but recommended to support newer compression.
 
 ```
 pip install pyzipper
 ```
 
-## Problem
+## Background: Problem
 
 - zipfile.py is a nice tool.  However, it converts the encoding of the filename
   into cp437 if the utf-8 bit (0x800) in the flag_bits of zipinfo is not set.
 
 - zip software in Windows OS (at least, 7 and 10) puts the filename
-  into the zip file as it is, and it doesn't set the utf-8 bit.
-  And, most users in Japan usually uses Shift_JIS (cp932) as the filenames.
+  into the zip file as it is.  It doesn't set the utf-8 bit even if
+  it is encoded by UTF-8.
+
+- Most users in Japan usually uses Shift_JIS (cp932) as the filenames.
   Mac users will see a corrupted filename when they decode such a zip file.
 
 - some zip software (e.g. mac, /usr/bin/zip) doesn't set utf-8 bit
@@ -34,7 +38,13 @@ pip install pyzipper
   doesn't support some encryption algorithms such as AES256.  In this case,
   you see the message like "need PK compat. v5.1 (can do v4.5)".
 
+- Even betwen Windows OS, a user can't decrypt a zip file.
+  That is because the embeded unzip utility (Zipcrypto) doesn't support AES256.
+  7z or lhaplus could decrypt such file.
+
 ## Strategy
+
+I do want a single solution to solve above problems.
 
 So, firstly this unzipx checks the utf-8 flag in flag_bits of zipinfo.
 If it sets, use the filename as it is because zipfile.py can manage
