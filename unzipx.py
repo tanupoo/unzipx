@@ -42,6 +42,8 @@ def do_extract(z, zi, dname, fpath):
         _check_compression(zi.compress_type)
     except Exception as e:
         print(f"ERROR: {e}")
+        if "compression method is not supported" in str(e):
+            print("NOTE: pyzipper may be required. try pip install pyzipper.")
         raise
     # create directories.
     if dname and opt.recursive:
